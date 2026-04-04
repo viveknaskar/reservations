@@ -31,6 +31,17 @@ public class ReservationService {
         this.reservationRepository = reservationRepository;
     }
 
+    public Reservation createReservation(Reservation reservation) {
+        return reservationRepository.save(reservation);
+    }
+
+    public void deleteReservation(long id) {
+        if (!reservationRepository.existsById(id)) {
+            throw new EntityNotFoundException("Reservation not found");
+        }
+        reservationRepository.deleteById(id);
+    }
+
     public List<RoomReservation> getRoomReservationsForDate(String dateString) {
         Date date = this.createDateFromDateString(dateString);
         Iterable<Room> rooms = this.roomRepository.findAll();
