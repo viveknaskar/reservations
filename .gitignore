@@ -119,6 +119,10 @@ buildNumber.properties
 .mvn/timing.properties
 .mvn/wrapper/maven-wrapper.jar
 
+### Maven Wrapper ###
+mvnw.cmd
+mvnw
+
 ### Windows ###
 # Windows thumbnail cache files
 Thumbs.db
