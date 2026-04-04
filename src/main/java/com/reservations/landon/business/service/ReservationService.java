@@ -11,14 +11,15 @@ import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.text.DateFormat;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 
 @Service
 public class ReservationService {
-    private static final DateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
+    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private final RoomRepository roomRepository;
     private final GuestRepository guestRepository;
     private final ReservationRepository reservationRepository;
@@ -42,19 +43,14 @@ public class ReservationService {
             roomReservationMap.put(room.getId(), roomReservation);
         });
         Iterable<Reservation> reservations = this.reservationRepository.findByDate(new java.sql.Date(date.getTime()));
-        if (null != reservations) {
-            reservations.forEach(reservation -> {
-                Guest guest = this.guestRepository.findById(reservation.getGuestId()).orElseThrow(() -> new EntityNotFoundException("Guest not found"));
-
-                if (null != guest) {
-                    RoomReservation roomReservation = roomReservationMap.get(reservation.getId());
-                    roomReservation.setDate(date);
-                    roomReservation.setFirstName(guest.getFirstName());
-                    roomReservation.setLastName(guest.getLastName());
-                    roomReservation.setGuestId(guest.getId());
-                }
-            });
-        }
+        reservations.forEach(reservation -> {
+            Guest guest = this.guestRepository.findById(reservation.getGuestId()).orElseThrow(() -> new EntityNotFoundException("Guest not found"));
+            RoomReservation roomReservation = roomReservationMap.get(reservation.getRoomId());
+            roomReservation.setDate(date);
+            roomReservation.setFirstName(guest.getFirstName());
+            roomReservation.setLastName(guest.getLastName());
+            roomReservation.setGuestId(guest.getId());
+        });
         List<RoomReservation> roomReservations = new ArrayList<>();
         for (Long roomId : roomReservationMap.keySet()) {
             roomReservations.add(roomReservationMap.get(roomId));
@@ -63,16 +59,14 @@ public class ReservationService {
     }
 
     private Date createDateFromDateString(String dateString) {
-        Date date = null;
-        if (null != dateString) {
+        if (dateString != null) {
             try {
-                date = DATE_FORMAT.parse(dateString);
-            } catch (ParseException pe) {
-                date = new Date();
+                LocalDate localDate = LocalDate.parse(dateString, DATE_FORMAT);
+                return Date.from(localDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
+            } catch (DateTimeParseException e) {
+                return new Date();
             }
-        } else {
-            date = new Date();
         }
-        return date;
+        return new Date();
     }
 }
