@@ -16,6 +16,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class ReservationService {
@@ -44,29 +45,30 @@ public class ReservationService {
 
     public List<RoomReservation> getRoomReservationsForDate(String dateString) {
         Date date = this.createDateFromDateString(dateString);
-        Iterable<Room> rooms = this.roomRepository.findAll();
         Map<Long, RoomReservation> roomReservationMap = new HashMap<>();
-        rooms.forEach(room -> {
+        this.roomRepository.findAll().forEach(room -> {
             RoomReservation roomReservation = new RoomReservation();
             roomReservation.setRoomId(room.getId());
             roomReservation.setRoomName(room.getName());
             roomReservation.setRoomNumber(room.getNumber());
             roomReservationMap.put(room.getId(), roomReservation);
         });
-        Iterable<Reservation> reservations = this.reservationRepository.findByDate(new java.sql.Date(date.getTime()));
-        reservations.forEach(reservation -> {
-            Guest guest = this.guestRepository.findById(reservation.getGuestId()).orElseThrow(() -> new EntityNotFoundException("Guest not found"));
-            RoomReservation roomReservation = roomReservationMap.get(reservation.getRoomId());
-            roomReservation.setDate(date);
-            roomReservation.setFirstName(guest.getFirstName());
-            roomReservation.setLastName(guest.getLastName());
-            roomReservation.setGuestId(guest.getId());
-        });
-        List<RoomReservation> roomReservations = new ArrayList<>();
-        for (Long roomId : roomReservationMap.keySet()) {
-            roomReservations.add(roomReservationMap.get(roomId));
+        List<Reservation> reservations = this.reservationRepository.findByDate(new java.sql.Date(date.getTime()));
+        if (!reservations.isEmpty()) {
+            List<Long> guestIds = reservations.stream().map(Reservation::getGuestId).collect(Collectors.toList());
+            Map<Long, Guest> guestMap = new HashMap<>();
+            this.guestRepository.findAllById(guestIds).forEach(g -> guestMap.put(g.getId(), g));
+            reservations.forEach(reservation -> {
+                Guest guest = guestMap.get(reservation.getGuestId());
+                if (guest == null) throw new EntityNotFoundException("Guest not found");
+                RoomReservation roomReservation = roomReservationMap.get(reservation.getRoomId());
+                roomReservation.setDate(date);
+                roomReservation.setFirstName(guest.getFirstName());
+                roomReservation.setLastName(guest.getLastName());
+                roomReservation.setGuestId(guest.getId());
+            });
         }
-        return roomReservations;
+        return new ArrayList<>(roomReservationMap.values());
     }
 
     private Date createDateFromDateString(String dateString) {

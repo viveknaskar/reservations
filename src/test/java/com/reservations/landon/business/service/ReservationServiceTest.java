@@ -17,11 +17,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.sql.Date;
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyIterable;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -65,7 +65,7 @@ class ReservationServiceTest {
     void getRoomReservationsForDate_withReservation_returnsPopulatedRoomReservation() {
         when(roomRepository.findAll()).thenReturn(List.of(room));
         when(reservationRepository.findByDate(any(Date.class))).thenReturn(List.of(reservation));
-        when(guestRepository.findById(10L)).thenReturn(Optional.of(guest));
+        when(guestRepository.findAllById(anyIterable())).thenReturn(List.of(guest));
 
         List<RoomReservation> result = reservationService.getRoomReservationsForDate("2024-06-15");
 
@@ -117,7 +117,7 @@ class ReservationServiceTest {
     void getRoomReservationsForDate_guestNotFound_throwsEntityNotFoundException() {
         when(roomRepository.findAll()).thenReturn(List.of(room));
         when(reservationRepository.findByDate(any(Date.class))).thenReturn(List.of(reservation));
-        when(guestRepository.findById(10L)).thenReturn(Optional.empty());
+        when(guestRepository.findAllById(anyIterable())).thenReturn(List.of());
 
         assertThatThrownBy(() -> reservationService.getRoomReservationsForDate("2024-06-15"))
                 .isInstanceOf(EntityNotFoundException.class)
