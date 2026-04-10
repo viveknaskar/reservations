@@ -1,7 +1,7 @@
 package com.reservations.landon.business.controller;
 
+import com.reservations.landon.business.service.RoomService;
 import com.reservations.landon.data.entity.Room;
-import com.reservations.landon.data.repository.RoomRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -21,7 +21,7 @@ class RoomControllerTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private RoomRepository roomRepository;
+    private RoomService roomService;
 
     @Test
     void findAll_noFilter_returnsAllRooms() throws Exception {
@@ -31,7 +31,7 @@ class RoomControllerTest {
         room.setNumber("1A");
         room.setBedInfo("KG");
 
-        when(roomRepository.findAll()).thenReturn(List.of(room));
+        when(roomService.getAllRooms(null)).thenReturn(List.of(room));
 
         mockMvc.perform(get("/rooms"))
                 .andExpect(status().isOk())
@@ -47,7 +47,7 @@ class RoomControllerTest {
         room.setNumber("1A");
         room.setBedInfo("KG");
 
-        when(roomRepository.findByNumber("1A")).thenReturn(room);
+        when(roomService.getAllRooms("1A")).thenReturn(List.of(room));
 
         mockMvc.perform(get("/rooms").param("roomNumber", "1A"))
                 .andExpect(status().isOk())
@@ -56,7 +56,7 @@ class RoomControllerTest {
 
     @Test
     void findAll_withUnknownRoomNumber_returnsEmptyList() throws Exception {
-        when(roomRepository.findByNumber("99")).thenReturn(null);
+        when(roomService.getAllRooms("99")).thenReturn(List.of());
 
         mockMvc.perform(get("/rooms").param("roomNumber", "99"))
                 .andExpect(status().isOk())

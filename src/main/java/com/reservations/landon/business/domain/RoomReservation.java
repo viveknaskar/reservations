@@ -1,16 +1,17 @@
 package com.reservations.landon.business.domain;
 
-import java.util.Date;
+import java.time.LocalDate;
 
 public class RoomReservation {
-	
+
 	private long roomId;
 	private long guestId;
 	private String roomName;
 	private String roomNumber;
 	private String firstName;
 	private String lastName;
-	private Date date;
+	private LocalDate checkInDate;
+	private LocalDate checkOutDate;
 
 	public long getRoomId() {
 		return roomId;
@@ -60,11 +61,19 @@ public class RoomReservation {
 		this.lastName = lastName;
 	}
 
-	public Date getDate() {
-		return date;
+	public LocalDate getCheckInDate() {
+		return checkInDate;
 	}
 
-	public void setDate(Date date) {
-		this.date = date;
+	public void setCheckInDate(LocalDate checkInDate) {
+		this.checkInDate = checkInDate;
+	}
+
+	public LocalDate getCheckOutDate() {
+		return checkOutDate;
+	}
+
+	public void setCheckOutDate(LocalDate checkOutDate) {
+		this.checkOutDate = checkOutDate;
 	}
 }

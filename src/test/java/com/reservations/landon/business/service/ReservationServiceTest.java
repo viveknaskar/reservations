@@ -1,13 +1,13 @@
 package com.reservations.landon.business.service;
 
 import com.reservations.landon.business.domain.RoomReservation;
+import com.reservations.landon.data.entity.BookingStatus;
 import com.reservations.landon.data.entity.Guest;
 import com.reservations.landon.data.entity.Reservation;
 import com.reservations.landon.data.entity.Room;
 import com.reservations.landon.data.repository.GuestRepository;
 import com.reservations.landon.data.repository.ReservationRepository;
 import com.reservations.landon.data.repository.RoomRepository;
-import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,13 +15,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.sql.Date;
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyIterable;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -56,16 +55,18 @@ class ReservationServiceTest {
 
         reservation = new Reservation();
         reservation.setId(100L);
-        reservation.setRoomId(1L);
-        reservation.setGuestId(10L);
-        reservation.setDate(Date.valueOf("2024-06-15"));
+        reservation.setRoom(room);
+        reservation.setGuest(guest);
+        reservation.setCheckInDate(LocalDate.of(2024, 6, 15));
+        reservation.setCheckOutDate(LocalDate.of(2024, 6, 17));
+        reservation.setStatus(BookingStatus.CONFIRMED);
     }
 
     @Test
     void getRoomReservationsForDate_withReservation_returnsPopulatedRoomReservation() {
         when(roomRepository.findAll()).thenReturn(List.of(room));
-        when(reservationRepository.findByDate(any(Date.class))).thenReturn(List.of(reservation));
-        when(guestRepository.findAllById(anyIterable())).thenReturn(List.of(guest));
+        when(reservationRepository.findByDateCovering(any(LocalDate.class), eq(BookingStatus.CANCELLED)))
+            .thenReturn(List.of(reservation));
 
         List<RoomReservation> result = reservationService.getRoomReservationsForDate("2024-06-15");
 
@@ -82,7 +83,8 @@ class ReservationServiceTest {
     @Test
     void getRoomReservationsForDate_noReservations_returnsRoomsWithoutGuests() {
         when(roomRepository.findAll()).thenReturn(List.of(room));
-        when(reservationRepository.findByDate(any(Date.class))).thenReturn(List.of());
+        when(reservationRepository.findByDateCovering(any(LocalDate.class), eq(BookingStatus.CANCELLED)))
+            .thenReturn(List.of());
 
         List<RoomReservation> result = reservationService.getRoomReservationsForDate("2024-06-15");
 
@@ -96,7 +98,8 @@ class ReservationServiceTest {
     @Test
     void getRoomReservationsForDate_nullDate_usesToday() {
         when(roomRepository.findAll()).thenReturn(List.of(room));
-        when(reservationRepository.findByDate(any(Date.class))).thenReturn(List.of());
+        when(reservationRepository.findByDateCovering(any(LocalDate.class), eq(BookingStatus.CANCELLED)))
+            .thenReturn(List.of());
 
         List<RoomReservation> result = reservationService.getRoomReservationsForDate(null);
 
@@ -106,7 +109,8 @@ class ReservationServiceTest {
     @Test
     void getRoomReservationsForDate_invalidDateFormat_fallsBackToToday() {
         when(roomRepository.findAll()).thenReturn(List.of(room));
-        when(reservationRepository.findByDate(any(Date.class))).thenReturn(List.of());
+        when(reservationRepository.findByDateCovering(any(LocalDate.class), eq(BookingStatus.CANCELLED)))
+            .thenReturn(List.of());
 
         List<RoomReservation> result = reservationService.getRoomReservationsForDate("not-a-date");
 
@@ -114,20 +118,10 @@ class ReservationServiceTest {
     }
 
     @Test
-    void getRoomReservationsForDate_guestNotFound_throwsEntityNotFoundException() {
-        when(roomRepository.findAll()).thenReturn(List.of(room));
-        when(reservationRepository.findByDate(any(Date.class))).thenReturn(List.of(reservation));
-        when(guestRepository.findAllById(anyIterable())).thenReturn(List.of());
-
-        assertThatThrownBy(() -> reservationService.getRoomReservationsForDate("2024-06-15"))
-                .isInstanceOf(EntityNotFoundException.class)
-                .hasMessage("Guest not found");
-    }
-
-    @Test
     void getRoomReservationsForDate_noRooms_returnsEmptyList() {
         when(roomRepository.findAll()).thenReturn(List.of());
-        when(reservationRepository.findByDate(any(Date.class))).thenReturn(List.of());
+        when(reservationRepository.findByDateCovering(any(LocalDate.class), eq(BookingStatus.CANCELLED)))
+            .thenReturn(List.of());
 
         List<RoomReservation> result = reservationService.getRoomReservationsForDate("2024-06-15");
 

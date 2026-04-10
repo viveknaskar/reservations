@@ -1,9 +1,10 @@
 package com.reservations.landon.business.controller;
 
+import com.reservations.landon.business.domain.CreateReservationRequest;
+import com.reservations.landon.business.domain.ReservationResponse;
 import com.reservations.landon.business.domain.RoomReservation;
 import com.reservations.landon.business.service.ReservationService;
-import com.reservations.landon.data.entity.Reservation;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.reservations.landon.data.entity.BookingStatus;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,29 +14,39 @@ import java.util.List;
 @RequestMapping(value = "/api/reservations")
 public class ReservationServiceController {
 
-	@Autowired
-	private ReservationService reservationService;
+    private final ReservationService reservationService;
 
-	@GetMapping("/{date}")
-	public List<RoomReservation> getAllReservationsForDate(@PathVariable(value = "date") String dateString) {
-		return this.reservationService.getRoomReservationsForDate(dateString);
-	}
+    public ReservationServiceController(ReservationService reservationService) {
+        this.reservationService = reservationService;
+    }
 
-	@GetMapping
-	public List<RoomReservation> getAllReservations(@RequestParam(value = "date", required = false) String dateString) {
-		return reservationService.getRoomReservationsForDate(dateString);
-	}
+    @GetMapping
+    public List<RoomReservation> getReservationsForDate(
+            @RequestParam(value = "date", required = false) String dateString) {
+        return reservationService.getRoomReservationsForDate(dateString);
+    }
 
-	@PostMapping
-	@ResponseStatus(HttpStatus.CREATED)
-	public Reservation createReservation(@RequestBody Reservation reservation) {
-		return reservationService.createReservation(reservation);
-	}
+    @GetMapping("/guest/{guestId}")
+    public List<ReservationResponse> getReservationsForGuest(@PathVariable long guestId) {
+        return reservationService.getReservationsForGuest(guestId);
+    }
 
-	@DeleteMapping("/{id}")
-	@ResponseStatus(HttpStatus.NO_CONTENT)
-	public void deleteReservation(@PathVariable long id) {
-		reservationService.deleteReservation(id);
-	}
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public ReservationResponse createReservation(@RequestBody CreateReservationRequest request) {
+        return reservationService.createReservation(request);
+    }
 
+    @PatchMapping("/{id}/status")
+    public ReservationResponse updateStatus(
+            @PathVariable long id,
+            @RequestParam BookingStatus status) {
+        return reservationService.updateStatus(id, status);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteReservation(@PathVariable long id) {
+        reservationService.deleteReservation(id);
+    }
 }

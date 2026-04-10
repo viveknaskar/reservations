@@ -1,6 +1,9 @@
 package com.reservations.landon.business.service;
 
+import com.reservations.landon.business.domain.CreateReservationRequest;
+import com.reservations.landon.business.domain.ReservationResponse;
 import com.reservations.landon.business.domain.RoomReservation;
+import com.reservations.landon.data.entity.BookingStatus;
 import com.reservations.landon.data.entity.Guest;
 import com.reservations.landon.data.entity.Reservation;
 import com.reservations.landon.data.entity.Room;
@@ -8,34 +11,73 @@ import com.reservations.landon.data.repository.GuestRepository;
 import com.reservations.landon.data.repository.ReservationRepository;
 import com.reservations.landon.data.repository.RoomRepository;
 import jakarta.persistence.EntityNotFoundException;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Service
 public class ReservationService {
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
     private final RoomRepository roomRepository;
     private final GuestRepository guestRepository;
     private final ReservationRepository reservationRepository;
 
-    @Autowired
-    public ReservationService(RoomRepository roomRepository, GuestRepository guestRepository, ReservationRepository reservationRepository) {
+    public ReservationService(RoomRepository roomRepository, GuestRepository guestRepository,
+                               ReservationRepository reservationRepository) {
         this.roomRepository = roomRepository;
         this.guestRepository = guestRepository;
         this.reservationRepository = reservationRepository;
     }
 
-    public Reservation createReservation(Reservation reservation) {
-        return reservationRepository.save(reservation);
+    @Transactional
+    public ReservationResponse createReservation(CreateReservationRequest request) {
+        if (!request.getCheckOutDate().isAfter(request.getCheckInDate())) {
+            throw new IllegalArgumentException("Check-out date must be after check-in date");
+        }
+        Room room = roomRepository.findById(request.getRoomId())
+            .orElseThrow(() -> new EntityNotFoundException("Room not found"));
+        Guest guest = guestRepository.findById(request.getGuestId())
+            .orElseThrow(() -> new EntityNotFoundException("Guest not found"));
+
+        List<Reservation> conflicts = reservationRepository.findConflictingReservations(
+            request.getRoomId(), request.getCheckInDate(), request.getCheckOutDate(), BookingStatus.CANCELLED);
+        if (!conflicts.isEmpty()) {
+            throw new IllegalStateException("Room is not available for the requested dates");
+        }
+
+        long nights = ChronoUnit.DAYS.between(request.getCheckInDate(), request.getCheckOutDate());
+        BigDecimal totalPrice = room.getPricePerNight().multiply(BigDecimal.valueOf(nights));
+
+        Reservation reservation = new Reservation();
+        reservation.setRoom(room);
+        reservation.setGuest(guest);
+        reservation.setCheckInDate(request.getCheckInDate());
+        reservation.setCheckOutDate(request.getCheckOutDate());
+        reservation.setStatus(BookingStatus.PENDING);
+        reservation.setTotalPrice(totalPrice);
+
+        return toResponse(reservationRepository.save(reservation));
     }
 
+    @Transactional
+    public ReservationResponse updateStatus(long id, BookingStatus newStatus) {
+        Reservation reservation = reservationRepository.findById(id)
+            .orElseThrow(() -> new EntityNotFoundException("Reservation not found"));
+        reservation.setStatus(newStatus);
+        return toResponse(reservationRepository.save(reservation));
+    }
+
+    @Transactional
     public void deleteReservation(long id) {
         if (!reservationRepository.existsById(id)) {
             throw new EntityNotFoundException("Reservation not found");
@@ -43,43 +85,74 @@ public class ReservationService {
         reservationRepository.deleteById(id);
     }
 
+    @Transactional(readOnly = true)
     public List<RoomReservation> getRoomReservationsForDate(String dateString) {
-        Date date = this.createDateFromDateString(dateString);
+        LocalDate date = parseDateString(dateString);
         Map<Long, RoomReservation> roomReservationMap = new HashMap<>();
-        this.roomRepository.findAll().forEach(room -> {
-            RoomReservation roomReservation = new RoomReservation();
-            roomReservation.setRoomId(room.getId());
-            roomReservation.setRoomName(room.getName());
-            roomReservation.setRoomNumber(room.getNumber());
-            roomReservationMap.put(room.getId(), roomReservation);
+        roomRepository.findAll().forEach(room -> {
+            RoomReservation rr = new RoomReservation();
+            rr.setRoomId(room.getId());
+            rr.setRoomName(room.getName());
+            rr.setRoomNumber(room.getNumber());
+            roomReservationMap.put(room.getId(), rr);
         });
-        List<Reservation> reservations = this.reservationRepository.findByDate(new java.sql.Date(date.getTime()));
-        if (!reservations.isEmpty()) {
-            List<Long> guestIds = reservations.stream().map(Reservation::getGuestId).collect(Collectors.toList());
-            Map<Long, Guest> guestMap = new HashMap<>();
-            this.guestRepository.findAllById(guestIds).forEach(g -> guestMap.put(g.getId(), g));
-            reservations.forEach(reservation -> {
-                Guest guest = guestMap.get(reservation.getGuestId());
-                if (guest == null) throw new EntityNotFoundException("Guest not found");
-                RoomReservation roomReservation = roomReservationMap.get(reservation.getRoomId());
-                roomReservation.setDate(date);
-                roomReservation.setFirstName(guest.getFirstName());
-                roomReservation.setLastName(guest.getLastName());
-                roomReservation.setGuestId(guest.getId());
-            });
-        }
+        reservationRepository.findByDateCovering(date, BookingStatus.CANCELLED).forEach(reservation -> {
+            RoomReservation rr = roomReservationMap.get(reservation.getRoom().getId());
+            rr.setCheckInDate(reservation.getCheckInDate());
+            rr.setCheckOutDate(reservation.getCheckOutDate());
+            rr.setFirstName(reservation.getGuest().getFirstName());
+            rr.setLastName(reservation.getGuest().getLastName());
+            rr.setGuestId(reservation.getGuest().getId());
+        });
         return new ArrayList<>(roomReservationMap.values());
     }
 
-    private Date createDateFromDateString(String dateString) {
+    @Transactional(readOnly = true)
+    public List<Room> findAvailableRooms(LocalDate checkIn, LocalDate checkOut, int minCapacity) {
+        if (!checkOut.isAfter(checkIn)) {
+            throw new IllegalArgumentException("Check-out date must be after check-in date");
+        }
+        List<Long> bookedIds = reservationRepository.findBookedRoomIds(checkIn, checkOut, BookingStatus.CANCELLED);
+        List<Room> candidates = minCapacity > 1
+            ? roomRepository.findByMaxCapacityGreaterThanEqual(minCapacity)
+            : roomRepository.findAll();
+        if (bookedIds.isEmpty()) {
+            return candidates;
+        }
+        return candidates.stream().filter(r -> !bookedIds.contains(r.getId())).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ReservationResponse> getReservationsForGuest(long guestId) {
+        return reservationRepository.findByGuest_Id(guestId).stream()
+            .map(this::toResponse)
+            .toList();
+    }
+
+    private ReservationResponse toResponse(Reservation r) {
+        ReservationResponse resp = new ReservationResponse();
+        resp.setId(r.getId());
+        resp.setRoomId(r.getRoom().getId());
+        resp.setRoomName(r.getRoom().getName());
+        resp.setRoomNumber(r.getRoom().getNumber());
+        resp.setGuestId(r.getGuest().getId());
+        resp.setGuestFirstName(r.getGuest().getFirstName());
+        resp.setGuestLastName(r.getGuest().getLastName());
+        resp.setCheckInDate(r.getCheckInDate());
+        resp.setCheckOutDate(r.getCheckOutDate());
+        resp.setStatus(r.getStatus());
+        resp.setTotalPrice(r.getTotalPrice());
+        return resp;
+    }
+
+    private LocalDate parseDateString(String dateString) {
         if (dateString != null) {
             try {
-                LocalDate localDate = LocalDate.parse(dateString, DATE_FORMAT);
-                return Date.from(localDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
+                return LocalDate.parse(dateString, DATE_FORMAT);
             } catch (DateTimeParseException e) {
-                return new Date();
+                return LocalDate.now();
             }
         }
-        return new Date();
+        return LocalDate.now();
     }
 }

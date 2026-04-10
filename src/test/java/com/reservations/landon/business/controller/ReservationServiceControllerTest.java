@@ -1,8 +1,10 @@
 package com.reservations.landon.business.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.reservations.landon.business.domain.CreateReservationRequest;
+import com.reservations.landon.business.domain.ReservationResponse;
 import com.reservations.landon.business.service.ReservationService;
-import com.reservations.landon.data.entity.Reservation;
+import com.reservations.landon.data.entity.BookingStatus;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,7 +13,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.sql.Date;
+import java.time.LocalDate;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -31,27 +33,29 @@ class ReservationServiceControllerTest {
     private ReservationService reservationService;
 
     @Test
-    void createReservation_validBody_returns201WithSavedReservation() throws Exception {
-        Reservation input = new Reservation();
-        input.setRoomId(1L);
-        input.setGuestId(10L);
-        input.setDate(Date.valueOf("2024-06-15"));
+    void createReservation_validBody_returns201WithReservationResponse() throws Exception {
+        CreateReservationRequest request = new CreateReservationRequest();
+        request.setRoomId(1L);
+        request.setGuestId(10L);
+        request.setCheckInDate(LocalDate.of(2024, 6, 15));
+        request.setCheckOutDate(LocalDate.of(2024, 6, 17));
 
-        Reservation saved = new Reservation();
-        saved.setId(100L);
-        saved.setRoomId(1L);
-        saved.setGuestId(10L);
-        saved.setDate(Date.valueOf("2024-06-15"));
+        ReservationResponse response = new ReservationResponse();
+        response.setId(100L);
+        response.setRoomId(1L);
+        response.setGuestId(10L);
+        response.setStatus(BookingStatus.PENDING);
 
-        when(reservationService.createReservation(any(Reservation.class))).thenReturn(saved);
+        when(reservationService.createReservation(any(CreateReservationRequest.class))).thenReturn(response);
 
         mockMvc.perform(post("/api/reservations")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(input)))
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(100L))
                 .andExpect(jsonPath("$.roomId").value(1L))
-                .andExpect(jsonPath("$.guestId").value(10L));
+                .andExpect(jsonPath("$.guestId").value(10L))
+                .andExpect(jsonPath("$.status").value("PENDING"));
     }
 
     @Test
