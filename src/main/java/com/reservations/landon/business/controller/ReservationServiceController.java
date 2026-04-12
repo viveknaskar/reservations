@@ -5,6 +5,7 @@ import com.reservations.landon.business.domain.ReservationResponse;
 import com.reservations.landon.business.domain.RoomReservation;
 import com.reservations.landon.business.service.ReservationService;
 import com.reservations.landon.data.entity.BookingStatus;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -33,7 +34,7 @@ public class ReservationServiceController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ReservationResponse createReservation(@RequestBody CreateReservationRequest request) {
+    public ReservationResponse createReservation(@Valid @RequestBody CreateReservationRequest request) {
         return reservationService.createReservation(request);
     }
 

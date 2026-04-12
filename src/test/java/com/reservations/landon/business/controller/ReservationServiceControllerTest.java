@@ -17,6 +17,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.LocalDate;
 import java.util.List;
 
+import org.hamcrest.Matchers;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -111,6 +112,22 @@ class ReservationServiceControllerTest {
                 .andExpect(jsonPath("$.roomId").value(1L))
                 .andExpect(jsonPath("$.guestId").value(10L))
                 .andExpect(jsonPath("$.status").value("PENDING"));
+    }
+
+    @Test
+    void createReservation_nullCheckInDate_returns400WithValidationMessage() throws Exception {
+        CreateReservationRequest request = new CreateReservationRequest();
+        request.setRoomId(1L);
+        request.setGuestId(10L);
+        // checkInDate intentionally left null
+        request.setCheckOutDate(LocalDate.of(2024, 6, 17));
+
+        mockMvc.perform(post("/api/reservations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("checkInDate")));
     }
 
     @Test

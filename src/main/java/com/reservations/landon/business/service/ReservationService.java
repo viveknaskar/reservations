@@ -11,6 +11,8 @@ import com.reservations.landon.data.repository.GuestRepository;
 import com.reservations.landon.data.repository.ReservationRepository;
 import com.reservations.landon.data.repository.RoomRepository;
 import jakarta.persistence.EntityNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +28,7 @@ import java.util.Map;
 
 @Service
 public class ReservationService {
+    private static final Logger log = LoggerFactory.getLogger(ReservationService.class);
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     private final RoomRepository roomRepository;
@@ -66,7 +69,11 @@ public class ReservationService {
         reservation.setStatus(BookingStatus.PENDING);
         reservation.setTotalPrice(totalPrice);
 
-        return toResponse(reservationRepository.save(reservation));
+        ReservationResponse response = toResponse(reservationRepository.save(reservation));
+        log.info("Created reservation id={} room={} guest={} checkIn={} checkOut={} total={}",
+            response.getId(), request.getRoomId(), request.getGuestId(),
+            request.getCheckInDate(), request.getCheckOutDate(), response.getTotalPrice());
+        return response;
     }
 
     @Transactional
@@ -74,7 +81,9 @@ public class ReservationService {
         Reservation reservation = reservationRepository.findById(id)
             .orElseThrow(() -> new EntityNotFoundException("Reservation not found"));
         reservation.setStatus(newStatus);
-        return toResponse(reservationRepository.save(reservation));
+        ReservationResponse response = toResponse(reservationRepository.save(reservation));
+        log.info("Updated reservation id={} status={}", id, newStatus);
+        return response;
     }
 
     @Transactional
@@ -83,6 +92,7 @@ public class ReservationService {
             throw new EntityNotFoundException("Reservation not found");
         }
         reservationRepository.deleteById(id);
+        log.info("Deleted reservation id={}", id);
     }
 
     @Transactional(readOnly = true)
@@ -98,6 +108,11 @@ public class ReservationService {
         });
         reservationRepository.findByDateCovering(date, BookingStatus.CANCELLED).forEach(reservation -> {
             RoomReservation rr = roomReservationMap.get(reservation.getRoom().getId());
+            if (rr == null) {
+                log.warn("Reservation id={} references unknown room id={} — skipping",
+                    reservation.getId(), reservation.getRoom().getId());
+                return;
+            }
             rr.setCheckInDate(reservation.getCheckInDate());
             rr.setCheckOutDate(reservation.getCheckOutDate());
             rr.setFirstName(reservation.getGuest().getFirstName());

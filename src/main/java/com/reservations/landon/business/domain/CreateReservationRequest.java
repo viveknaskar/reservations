@@ -1,11 +1,22 @@
 package com.reservations.landon.business.domain;
 
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+
 import java.time.LocalDate;
 
 public class CreateReservationRequest {
+
+    @Positive(message = "Room ID must be a positive number")
     private long roomId;
+
+    @Positive(message = "Guest ID must be a positive number")
     private long guestId;
+
+    @NotNull(message = "Check-in date is required")
     private LocalDate checkInDate;
+
+    @NotNull(message = "Check-out date is required")
     private LocalDate checkOutDate;
 
     public long getRoomId() {
