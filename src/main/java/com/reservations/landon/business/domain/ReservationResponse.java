@@ -1,11 +1,12 @@
 package com.reservations.landon.business.domain;
 
 import com.reservations.landon.data.entity.BookingStatus;
+import org.springframework.hateoas.RepresentationModel;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
-public class ReservationResponse {
+public class ReservationResponse extends RepresentationModel<ReservationResponse> {
     private long id;
     private long roomId;
     private String roomName;

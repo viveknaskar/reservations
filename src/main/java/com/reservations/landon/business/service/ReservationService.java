@@ -76,6 +76,13 @@ public class ReservationService {
         return response;
     }
 
+    @Transactional(readOnly = true)
+    public ReservationResponse getById(long id) {
+        return reservationRepository.findById(id)
+            .map(this::toResponse)
+            .orElseThrow(() -> new EntityNotFoundException("Reservation not found"));
+    }
+
     @Transactional
     public ReservationResponse updateStatus(long id, BookingStatus newStatus) {
         Reservation reservation = reservationRepository.findById(id)
