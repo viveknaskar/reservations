@@ -44,7 +44,7 @@ class ReservationServiceControllerTest {
         rr.setRoomId(1L);
         rr.setRoomName("Suite A");
 
-        when(reservationService.getRoomReservationsForDate("2024-06-15")).thenReturn(List.of(rr));
+        when(reservationService.getRoomReservationsForDate(LocalDate.of(2024, 6, 15))).thenReturn(List.of(rr));
 
         mockMvc.perform(get("/api/reservations").param("date", "2024-06-15"))
                 .andExpect(status().isOk())
@@ -54,7 +54,7 @@ class ReservationServiceControllerTest {
 
     @Test
     void getReservationsForDate_noParam_returns200() throws Exception {
-        when(reservationService.getRoomReservationsForDate(null)).thenReturn(List.of());
+        when(reservationService.getRoomReservationsForDate((String) null)).thenReturn(List.of());
 
         mockMvc.perform(get("/api/reservations"))
                 .andExpect(status().isOk());
@@ -179,6 +179,12 @@ class ReservationServiceControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getReservationsForDate_invalidDate_returns400() throws Exception {
+        mockMvc.perform(get("/api/reservations").param("date", "not-a-date"))
+                .andExpect(status().isBadRequest());
     }
 
     // ── PATCH /api/reservations/{id}/status ───────────────────────────────────

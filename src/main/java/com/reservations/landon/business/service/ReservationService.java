@@ -22,6 +22,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,7 +48,7 @@ public class ReservationService {
         if (!request.getCheckOutDate().isAfter(request.getCheckInDate())) {
             throw new IllegalArgumentException("Check-out date must be after check-in date");
         }
-        Room room = roomRepository.findById(request.getRoomId())
+        Room room = roomRepository.findByIdForUpdate(request.getRoomId())
             .orElseThrow(() -> new EntityNotFoundException("Room not found"));
         Guest guest = guestRepository.findById(request.getGuestId())
             .orElseThrow(() -> new EntityNotFoundException("Guest not found"));
@@ -87,6 +88,7 @@ public class ReservationService {
     public ReservationResponse updateStatus(long id, BookingStatus newStatus) {
         Reservation reservation = reservationRepository.findById(id)
             .orElseThrow(() -> new EntityNotFoundException("Reservation not found"));
+        validateStatusTransition(reservation.getStatus(), newStatus);
         reservation.setStatus(newStatus);
         ReservationResponse response = toResponse(reservationRepository.save(reservation));
         log.info("Updated reservation id={} status={}", id, newStatus);
@@ -95,16 +97,22 @@ public class ReservationService {
 
     @Transactional
     public void deleteReservation(long id) {
-        if (!reservationRepository.existsById(id)) {
-            throw new EntityNotFoundException("Reservation not found");
+        Reservation reservation = reservationRepository.findById(id)
+            .orElseThrow(() -> new EntityNotFoundException("Reservation not found"));
+        if (reservation.getStatus() != BookingStatus.CANCELLED) {
+            reservation.setStatus(BookingStatus.CANCELLED);
+            reservationRepository.save(reservation);
         }
-        reservationRepository.deleteById(id);
-        log.info("Deleted reservation id={}", id);
+        log.info("Cancelled reservation id={}", id);
     }
 
     @Transactional(readOnly = true)
     public List<RoomReservation> getRoomReservationsForDate(String dateString) {
-        LocalDate date = parseDateString(dateString);
+        return getRoomReservationsForDate(parseDateString(dateString));
+    }
+
+    @Transactional(readOnly = true)
+    public List<RoomReservation> getRoomReservationsForDate(LocalDate date) {
         Map<Long, RoomReservation> roomReservationMap = new HashMap<>();
         roomRepository.findAll().forEach(room -> {
             RoomReservation rr = new RoomReservation();
@@ -126,7 +134,9 @@ public class ReservationService {
             rr.setLastName(reservation.getGuest().getLastName());
             rr.setGuestId(reservation.getGuest().getId());
         });
-        return new ArrayList<>(roomReservationMap.values());
+        return new ArrayList<>(roomReservationMap.values()).stream()
+            .sorted(Comparator.comparing(RoomReservation::getRoomNumber))
+            .toList();
     }
 
     @Transactional(readOnly = true)
@@ -141,7 +151,10 @@ public class ReservationService {
         if (bookedIds.isEmpty()) {
             return candidates;
         }
-        return candidates.stream().filter(r -> !bookedIds.contains(r.getId())).toList();
+        return candidates.stream()
+            .filter(r -> !bookedIds.contains(r.getId()))
+            .sorted(Comparator.comparing(Room::getNumber))
+            .toList();
     }
 
     @Transactional(readOnly = true)
@@ -165,6 +178,21 @@ public class ReservationService {
         resp.setStatus(r.getStatus());
         resp.setTotalPrice(r.getTotalPrice());
         return resp;
+    }
+
+    private void validateStatusTransition(BookingStatus currentStatus, BookingStatus newStatus) {
+        if (currentStatus == newStatus) {
+            return;
+        }
+        boolean valid = switch (currentStatus) {
+            case PENDING -> newStatus == BookingStatus.CONFIRMED || newStatus == BookingStatus.CANCELLED;
+            case CONFIRMED -> newStatus == BookingStatus.CANCELLED;
+            case CANCELLED -> false;
+        };
+        if (!valid) {
+            throw new IllegalArgumentException(
+                "Invalid reservation status transition from " + currentStatus + " to " + newStatus);
+        }
     }
 
     private LocalDate parseDateString(String dateString) {

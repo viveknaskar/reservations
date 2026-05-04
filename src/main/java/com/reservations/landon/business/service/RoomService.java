@@ -5,6 +5,7 @@ import com.reservations.landon.data.repository.RoomRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -19,7 +20,9 @@ public class RoomService {
     @Transactional(readOnly = true)
     public List<Room> getAllRooms(String roomNumber) {
         if (roomNumber == null) {
-            return roomRepository.findAll();
+            return roomRepository.findAll().stream()
+                .sorted(Comparator.comparing(Room::getNumber))
+                .toList();
         }
         Room room = roomRepository.findByNumber(roomNumber);
         return room != null ? List.of(room) : List.of();

@@ -93,4 +93,13 @@ class RoomAvailabilityControllerTest {
                         .param("checkOut", "2024-06-15"))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void getAvailableRooms_invalidMinCapacity_returns400() throws Exception {
+        mockMvc.perform(get("/api/rooms/available")
+                        .param("checkIn", "2024-06-15")
+                        .param("checkOut", "2024-06-17")
+                        .param("minCapacity", "0"))
+                .andExpect(status().isBadRequest());
+    }
 }

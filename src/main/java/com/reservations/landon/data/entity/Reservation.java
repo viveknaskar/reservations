@@ -32,8 +32,8 @@ public class Reservation {
     @Column(name="STATUS", nullable=false, length=16)
     private BookingStatus status = BookingStatus.PENDING;
 
-    @Column(name="TOTAL_PRICE")
-    private BigDecimal totalPrice;
+    @Column(name="TOTAL_PRICE", nullable=false)
+    private BigDecimal totalPrice = BigDecimal.ZERO;
 
     public long getId() {
         return id;

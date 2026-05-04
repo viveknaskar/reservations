@@ -11,8 +11,10 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.*;
@@ -31,8 +33,11 @@ public class ReservationServiceController {
     @Operation(summary = "Get room reservations for a date")
     @GetMapping
     public List<RoomReservation> getReservationsForDate(
-            @RequestParam(value = "date", required = false) String dateString) {
-        return reservationService.getRoomReservationsForDate(dateString);
+            @RequestParam(value = "date", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return date == null
+            ? reservationService.getRoomReservationsForDate((String) null)
+            : reservationService.getRoomReservationsForDate(date);
     }
 
     @Operation(summary = "Get reservation by ID")

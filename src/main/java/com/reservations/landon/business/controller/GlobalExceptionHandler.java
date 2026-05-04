@@ -3,11 +3,15 @@ package com.reservations.landon.business.controller;
 import com.reservations.landon.business.domain.ApiError;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.LocalDateTime;
 import java.util.stream.Collectors;
@@ -27,6 +31,17 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiError handleBadRequest(IllegalArgumentException ex, HttpServletRequest request) {
+        return new ApiError(HttpStatus.BAD_REQUEST.value(), ex.getMessage(), request.getRequestURI(), LocalDateTime.now());
+    }
+
+    @ExceptionHandler({
+        MissingServletRequestParameterException.class,
+        MethodArgumentTypeMismatchException.class,
+        HttpMessageNotReadableException.class,
+        ConstraintViolationException.class
+    })
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiError handleRequestBindingErrors(Exception ex, HttpServletRequest request) {
         return new ApiError(HttpStatus.BAD_REQUEST.value(), ex.getMessage(), request.getRequestURI(), LocalDateTime.now());
     }
 

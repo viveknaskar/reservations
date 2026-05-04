@@ -49,6 +49,7 @@ src/main/java/com/reservations/landon/
 │   ├── domain/             # DTOs (request/response objects)
 │   │   ├── CreateReservationRequest.java
 │   │   ├── ReservationResponse.java
+│   │   ├── RoomResponse.java
 │   │   └── RoomReservation.java                # View model for the web UI
 │   └── service/            # Business logic
 │       ├── ReservationService.java
@@ -68,9 +69,10 @@ src/main/java/com/reservations/landon/
 **Key design decisions:**
 
 - Controllers never touch repositories directly — all business logic goes through a service.
-- Controllers accept and return DTOs (`CreateReservationRequest`, `ReservationResponse`), not JPA entities. This prevents lazy-loading issues and keeps the API contract stable.
+- Controllers accept and return DTOs (`CreateReservationRequest`, `ReservationResponse`, `RoomResponse`), not JPA entities. This prevents lazy-loading issues and keeps the API contract stable.
 - `Reservation` uses `@ManyToOne(fetch = LAZY)` to `Room` and `Guest`, with `spring.jpa.open-in-view=false` enforced. All entity traversal happens inside `@Transactional` service methods.
 - `CANCELLED` reservations are never deleted — they are kept for audit history. All availability queries filter them out.
+- Reservation creation locks the target room row while checking conflicts and saving, reducing the risk of concurrent double-booking for the same room.
 
 ---
 
@@ -105,10 +107,12 @@ GUEST_ID         BIGINT  FK → GUEST
 CHECK_IN_DATE    DATE    NOT NULL
 CHECK_OUT_DATE   DATE    NOT NULL
 STATUS           VARCHAR(16)   DEFAULT 'PENDING'
-TOTAL_PRICE      DECIMAL(10,2)
+TOTAL_PRICE      DECIMAL(10,2) NOT NULL
 ```
 
 `TOTAL_PRICE` is stored as a snapshot of `pricePerNight × nights` at booking time, so it is unaffected by future room price changes.
+
+Constraints enforce `CHECK_OUT_DATE > CHECK_IN_DATE` and valid status values.
 
 Indexes: `CHECK_IN_DATE`, `CHECK_OUT_DATE`, `GUEST_ID`, `ROOM_ID`, `STATUS`.
 
@@ -129,7 +133,13 @@ mvn spring-boot:run
 
 The application starts on **http://localhost:8080**.
 
-**H2 Console** (for inspecting the database):
+To enable the H2 Console while developing, run with the `dev` profile:
+
+```bash
+mvn spring-boot:run -Dspring-boot.run.profiles=dev
+```
+
+**H2 Console**:
 ```
 URL:      http://localhost:8080/h2-console
 JDBC URL: jdbc:h2:mem:testdb
@@ -196,10 +206,10 @@ Returns rooms that have no active (non-cancelled) reservation overlapping the re
 curl "http://localhost:8080/api/rooms/available?checkIn=2025-07-01&checkOut=2025-07-05&minCapacity=2"
 ```
 
-**Response:** Array of `Room` objects (same format as `/rooms`).
+**Response:** Array of room response DTOs (same format as `/rooms`).
 
 **Errors:**
-- `400 Bad Request` — missing required parameter or `checkOut` ≤ `checkIn`
+- `400 Bad Request` — missing required parameter, invalid date format, `checkOut` ≤ `checkIn`, or `minCapacity` < 1
 
 ---
 
@@ -283,6 +293,7 @@ Valid transitions: `PENDING → CONFIRMED`, `PENDING → CANCELLED`, `CONFIRMED 
 **Response:** `200 OK` with updated `ReservationResponse`.
 
 **Errors:**
+- `400 Bad Request` — invalid status transition
 - `404 Not Found` — reservation does not exist
 
 #### Delete a reservation
@@ -290,7 +301,7 @@ Valid transitions: `PENDING → CONFIRMED`, `PENDING → CANCELLED`, `CONFIRMED 
 DELETE /api/reservations/{id}
 ```
 
-Hard deletes the reservation record. Use `PATCH /{id}/status?status=CANCELLED` instead if you want to preserve audit history.
+Cancels the reservation without deleting the record. This is equivalent to a soft delete and preserves audit history.
 
 **Response:** `204 No Content`
 
@@ -370,8 +381,8 @@ spring.datasource.driver-class-name=org.h2.Driver
 spring.datasource.username=sa
 spring.datasource.password=
 
-# Enable H2 web console at /h2-console
-spring.h2.console.enabled=true
+# H2 web console is disabled by default
+spring.h2.console.enabled=false
 
 # Use schema.sql / data.sql for DDL and seed data
 spring.jpa.hibernate.ddl-auto=none

@@ -103,7 +103,7 @@ class ReservationServiceTest {
         when(reservationRepository.findByDateCovering(any(LocalDate.class), eq(BookingStatus.CANCELLED)))
             .thenReturn(List.of());
 
-        assertThat(reservationService.getRoomReservationsForDate(null)).hasSize(1);
+        assertThat(reservationService.getRoomReservationsForDate((String) null)).hasSize(1);
     }
 
     @Test

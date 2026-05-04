@@ -53,7 +53,7 @@ class ReservationServiceWriteTest {
             LocalDate.of(2024, 6, 15), LocalDate.of(2024, 6, 17),
             BookingStatus.PENDING, new BigDecimal("200.00"));
 
-        when(roomRepository.findById(1L)).thenReturn(Optional.of(room));
+        when(roomRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(room));
         when(guestRepository.findById(10L)).thenReturn(Optional.of(guest));
         when(reservationRepository.findConflictingReservations(any(), any(), any(), any())).thenReturn(List.of());
         when(reservationRepository.save(any(Reservation.class))).thenReturn(saved);
@@ -96,7 +96,7 @@ class ReservationServiceWriteTest {
         CreateReservationRequest request = buildRequest(99L, 10L,
             LocalDate.of(2024, 6, 15), LocalDate.of(2024, 6, 17));
 
-        when(roomRepository.findById(99L)).thenReturn(Optional.empty());
+        when(roomRepository.findByIdForUpdate(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> reservationService.createReservation(request))
             .isInstanceOf(EntityNotFoundException.class)
@@ -112,7 +112,7 @@ class ReservationServiceWriteTest {
         CreateReservationRequest request = buildRequest(1L, 99L,
             LocalDate.of(2024, 6, 15), LocalDate.of(2024, 6, 17));
 
-        when(roomRepository.findById(1L)).thenReturn(Optional.of(room));
+        when(roomRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(room));
         when(guestRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> reservationService.createReservation(request))
@@ -130,7 +130,7 @@ class ReservationServiceWriteTest {
         CreateReservationRequest request = buildRequest(1L, 10L,
             LocalDate.of(2024, 6, 15), LocalDate.of(2024, 6, 17));
 
-        when(roomRepository.findById(1L)).thenReturn(Optional.of(room));
+        when(roomRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(room));
         when(guestRepository.findById(10L)).thenReturn(Optional.of(guest));
         when(reservationRepository.findConflictingReservations(any(), any(), any(), any()))
             .thenReturn(List.of(new Reservation()));
@@ -177,20 +177,45 @@ class ReservationServiceWriteTest {
         verify(reservationRepository, never()).save(any());
     }
 
+    @Test
+    void updateStatus_cancelledReservationCannotBeConfirmed() {
+        Room room = buildRoom(1L, "100.00");
+        Guest guest = buildGuest(10L);
+        Reservation existing = buildReservation(100L, room, guest,
+            LocalDate.of(2024, 6, 15), LocalDate.of(2024, 6, 17),
+            BookingStatus.CANCELLED, new BigDecimal("200.00"));
+
+        when(reservationRepository.findById(100L)).thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> reservationService.updateStatus(100L, BookingStatus.CONFIRMED))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Invalid reservation status transition from CANCELLED to CONFIRMED");
+
+        verify(reservationRepository, never()).save(any());
+    }
+
     // ── deleteReservation ─────────────────────────────────────────────────────
 
     @Test
-    void deleteReservation_existingId_deletesSuccessfully() {
-        when(reservationRepository.existsById(100L)).thenReturn(true);
+    void deleteReservation_existingId_cancelsWithoutDeleting() {
+        Room room = buildRoom(1L, "100.00");
+        Guest guest = buildGuest(10L);
+        Reservation existing = buildReservation(100L, room, guest,
+            LocalDate.of(2024, 6, 15), LocalDate.of(2024, 6, 17),
+            BookingStatus.CONFIRMED, new BigDecimal("200.00"));
+
+        when(reservationRepository.findById(100L)).thenReturn(Optional.of(existing));
 
         reservationService.deleteReservation(100L);
 
-        verify(reservationRepository).deleteById(100L);
+        assertThat(existing.getStatus()).isEqualTo(BookingStatus.CANCELLED);
+        verify(reservationRepository).save(existing);
+        verify(reservationRepository, never()).deleteById(any());
     }
 
     @Test
     void deleteReservation_nonExistingId_throwsEntityNotFoundException() {
-        when(reservationRepository.existsById(999L)).thenReturn(false);
+        when(reservationRepository.findById(999L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> reservationService.deleteReservation(999L))
             .isInstanceOf(EntityNotFoundException.class)

@@ -1,7 +1,7 @@
 package com.reservations.landon.business.controller;
 
+import com.reservations.landon.business.domain.RoomResponse;
 import com.reservations.landon.business.service.RoomService;
-import com.reservations.landon.data.entity.Room;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,7 +24,9 @@ public class RoomController {
 
     @Operation(summary = "List all rooms, or filter by room number")
     @GetMapping
-    public List<Room> findAll(@RequestParam(required = false) String roomNumber) {
-        return roomService.getAllRooms(roomNumber);
+    public List<RoomResponse> findAll(@RequestParam(required = false) String roomNumber) {
+        return roomService.getAllRooms(roomNumber).stream()
+            .map(RoomResponse::from)
+            .toList();
     }
 }
