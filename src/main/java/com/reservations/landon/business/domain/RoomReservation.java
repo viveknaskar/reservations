@@ -1,7 +1,10 @@
 package com.reservations.landon.business.domain;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.time.LocalDate;
 
+@Schema(description = "Room occupancy view for a single date")
 public class RoomReservation {
 
 	private long roomId;

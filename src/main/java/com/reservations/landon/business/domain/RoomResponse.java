@@ -1,15 +1,23 @@
 package com.reservations.landon.business.domain;
 
 import com.reservations.landon.data.entity.Room;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
 
+@Schema(description = "Room details returned by room listing and availability endpoints")
 public class RoomResponse {
+    @Schema(description = "Room ID", example = "7")
     private long id;
+    @Schema(description = "Room wing or room name", example = "Cambridge")
     private String name;
+    @Schema(description = "Hotel room number", example = "C2")
     private String number;
+    @Schema(description = "Bed configuration code", example = "1K")
     private String bedInfo;
+    @Schema(description = "Nightly room price captured for booking calculations", example = "109.00")
     private BigDecimal pricePerNight;
+    @Schema(description = "Maximum guest capacity", example = "2")
     private int maxCapacity;
 
     public static RoomResponse from(Room room) {

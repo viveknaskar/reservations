@@ -1,22 +1,35 @@
 package com.reservations.landon.business.domain;
 
 import com.reservations.landon.data.entity.BookingStatus;
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.hateoas.RepresentationModel;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+@Schema(description = "Reservation response with room, guest, status, price, and HATEOAS links")
 public class ReservationResponse extends RepresentationModel<ReservationResponse> {
+    @Schema(description = "Reservation ID", example = "1")
     private long id;
+    @Schema(description = "Booked room ID", example = "7")
     private long roomId;
+    @Schema(description = "Booked room name", example = "Cambridge")
     private String roomName;
+    @Schema(description = "Booked room number", example = "C2")
     private String roomNumber;
+    @Schema(description = "Guest ID", example = "85")
     private long guestId;
+    @Schema(description = "Guest first name", example = "Judith")
     private String guestFirstName;
+    @Schema(description = "Guest last name", example = "Young")
     private String guestLastName;
+    @Schema(description = "First night of the stay", example = "2025-07-01")
     private LocalDate checkInDate;
+    @Schema(description = "Checkout date; not occupied as a stay night", example = "2025-07-05")
     private LocalDate checkOutDate;
+    @Schema(description = "Booking lifecycle status", example = "PENDING")
     private BookingStatus status;
+    @Schema(description = "Snapshot total at booking time", example = "436.00")
     private BigDecimal totalPrice;
 
     public long getId() {

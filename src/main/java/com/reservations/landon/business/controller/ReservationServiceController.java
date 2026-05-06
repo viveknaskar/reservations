@@ -1,11 +1,16 @@
 package com.reservations.landon.business.controller;
 
 import com.reservations.landon.business.domain.CreateReservationRequest;
+import com.reservations.landon.business.domain.ApiError;
 import com.reservations.landon.business.domain.ReservationResponse;
 import com.reservations.landon.business.domain.RoomReservation;
 import com.reservations.landon.business.service.ReservationService;
 import com.reservations.landon.data.entity.BookingStatus;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,9 +35,25 @@ public class ReservationServiceController {
         this.reservationService = reservationService;
     }
 
-    @Operation(summary = "Get room reservations for a date")
+    @Operation(
+        summary = "Get room reservations for a date",
+        description = "Returns one occupancy row per room for the supplied date. Invalid date formats return 400; omitted date uses today."
+    )
+    @ApiResponses({
+        @ApiResponse(
+            responseCode = "200",
+            description = "Room occupancy rows returned",
+            content = @Content(array = @ArraySchema(schema = @Schema(implementation = RoomReservation.class)))
+        ),
+        @ApiResponse(
+            responseCode = "400",
+            description = "Invalid date format",
+            content = @Content(schema = @Schema(implementation = ApiError.class))
+        )
+    })
     @GetMapping
     public List<RoomReservation> getReservationsForDate(
+            @Parameter(description = "Date to inspect", example = "2017-01-01")
             @RequestParam(value = "date", required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return date == null
@@ -42,28 +63,64 @@ public class ReservationServiceController {
 
     @Operation(summary = "Get reservation by ID")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Reservation found"),
-        @ApiResponse(responseCode = "404", description = "Reservation not found")
+        @ApiResponse(
+            responseCode = "200",
+            description = "Reservation found",
+            content = @Content(schema = @Schema(implementation = ReservationResponse.class))
+        ),
+        @ApiResponse(
+            responseCode = "404",
+            description = "Reservation not found",
+            content = @Content(schema = @Schema(implementation = ApiError.class))
+        )
     })
     @GetMapping("/{id}")
-    public ReservationResponse getReservationById(@PathVariable long id) {
+    public ReservationResponse getReservationById(
+            @Parameter(description = "Reservation ID", example = "1")
+            @PathVariable long id) {
         return addLinks(reservationService.getById(id));
     }
 
     @Operation(summary = "Get all reservations for a guest")
+    @ApiResponse(
+        responseCode = "200",
+        description = "Reservations returned",
+        content = @Content(array = @ArraySchema(schema = @Schema(implementation = ReservationResponse.class)))
+    )
     @GetMapping("/guest/{guestId}")
-    public List<ReservationResponse> getReservationsForGuest(@PathVariable long guestId) {
+    public List<ReservationResponse> getReservationsForGuest(
+            @Parameter(description = "Guest ID", example = "85")
+            @PathVariable long guestId) {
         return reservationService.getReservationsForGuest(guestId).stream()
                 .map(this::addLinks)
                 .toList();
     }
 
-    @Operation(summary = "Create a new reservation")
+    @Operation(
+        summary = "Create a new reservation",
+        description = "Creates a PENDING reservation and writes one reservation-night slot for each occupied night. The database enforces unique room/date slots, so overlapping active reservations return 409 even under concurrent requests."
+    )
     @ApiResponses({
-        @ApiResponse(responseCode = "201", description = "Reservation created"),
-        @ApiResponse(responseCode = "400", description = "Invalid date range or missing fields"),
-        @ApiResponse(responseCode = "404", description = "Room or guest not found"),
-        @ApiResponse(responseCode = "409", description = "Room already booked for those dates")
+        @ApiResponse(
+            responseCode = "201",
+            description = "Reservation created",
+            content = @Content(schema = @Schema(implementation = ReservationResponse.class))
+        ),
+        @ApiResponse(
+            responseCode = "400",
+            description = "Invalid date range, malformed JSON, or missing/invalid request fields",
+            content = @Content(schema = @Schema(implementation = ApiError.class))
+        ),
+        @ApiResponse(
+            responseCode = "404",
+            description = "Room or guest not found",
+            content = @Content(schema = @Schema(implementation = ApiError.class))
+        ),
+        @ApiResponse(
+            responseCode = "409",
+            description = "Room already booked for those dates. This includes conflicts detected by the reservation-night unique constraint.",
+            content = @Content(schema = @Schema(implementation = ApiError.class))
+        )
     })
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -71,26 +128,53 @@ public class ReservationServiceController {
         return addLinks(reservationService.createReservation(request));
     }
 
-    @Operation(summary = "Update reservation status (PENDING → CONFIRMED or CANCELLED)")
+    @Operation(
+        summary = "Update reservation status",
+        description = "Valid transitions are PENDING to CONFIRMED, PENDING to CANCELLED, and CONFIRMED to CANCELLED. Cancelling releases reservation-night slots."
+    )
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Status updated"),
-        @ApiResponse(responseCode = "404", description = "Reservation not found")
+        @ApiResponse(
+            responseCode = "200",
+            description = "Status updated",
+            content = @Content(schema = @Schema(implementation = ReservationResponse.class))
+        ),
+        @ApiResponse(
+            responseCode = "400",
+            description = "Invalid status value or invalid status transition",
+            content = @Content(schema = @Schema(implementation = ApiError.class))
+        ),
+        @ApiResponse(
+            responseCode = "404",
+            description = "Reservation not found",
+            content = @Content(schema = @Schema(implementation = ApiError.class))
+        )
     })
     @PatchMapping("/{id}/status")
     public ReservationResponse updateStatus(
+            @Parameter(description = "Reservation ID", example = "1")
             @PathVariable long id,
+            @Parameter(description = "Target status", example = "CONFIRMED")
             @RequestParam BookingStatus status) {
         return addLinks(reservationService.updateStatus(id, status));
     }
 
-    @Operation(summary = "Delete a reservation")
+    @Operation(
+        summary = "Cancel a reservation",
+        description = "Soft-delete operation: marks the reservation CANCELLED and releases reservation-night slots. The reservation row is retained for audit history."
+    )
     @ApiResponses({
-        @ApiResponse(responseCode = "204", description = "Reservation deleted"),
-        @ApiResponse(responseCode = "404", description = "Reservation not found")
+        @ApiResponse(responseCode = "204", description = "Reservation cancelled; no response body"),
+        @ApiResponse(
+            responseCode = "404",
+            description = "Reservation not found",
+            content = @Content(schema = @Schema(implementation = ApiError.class))
+        )
     })
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteReservation(@PathVariable long id) {
+    public void deleteReservation(
+            @Parameter(description = "Reservation ID", example = "1")
+            @PathVariable long id) {
         reservationService.deleteReservation(id);
     }
 
