@@ -6,13 +6,16 @@ import com.reservations.landon.business.domain.RoomReservation;
 import com.reservations.landon.data.entity.BookingStatus;
 import com.reservations.landon.data.entity.Guest;
 import com.reservations.landon.data.entity.Reservation;
+import com.reservations.landon.data.entity.ReservationNight;
 import com.reservations.landon.data.entity.Room;
 import com.reservations.landon.data.repository.GuestRepository;
+import com.reservations.landon.data.repository.ReservationNightRepository;
 import com.reservations.landon.data.repository.ReservationRepository;
 import com.reservations.landon.data.repository.RoomRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,12 +38,15 @@ public class ReservationService {
     private final RoomRepository roomRepository;
     private final GuestRepository guestRepository;
     private final ReservationRepository reservationRepository;
+    private final ReservationNightRepository reservationNightRepository;
 
     public ReservationService(RoomRepository roomRepository, GuestRepository guestRepository,
-                               ReservationRepository reservationRepository) {
+                               ReservationRepository reservationRepository,
+                               ReservationNightRepository reservationNightRepository) {
         this.roomRepository = roomRepository;
         this.guestRepository = guestRepository;
         this.reservationRepository = reservationRepository;
+        this.reservationNightRepository = reservationNightRepository;
     }
 
     @Transactional
@@ -70,7 +76,10 @@ public class ReservationService {
         reservation.setStatus(BookingStatus.PENDING);
         reservation.setTotalPrice(totalPrice);
 
-        ReservationResponse response = toResponse(reservationRepository.save(reservation));
+        Reservation saved = reservationRepository.saveAndFlush(reservation);
+        saveReservationNights(saved);
+
+        ReservationResponse response = toResponse(saved);
         log.info("Created reservation id={} room={} guest={} checkIn={} checkOut={} total={}",
             response.getId(), request.getRoomId(), request.getGuestId(),
             request.getCheckInDate(), request.getCheckOutDate(), response.getTotalPrice());
@@ -90,6 +99,9 @@ public class ReservationService {
             .orElseThrow(() -> new EntityNotFoundException("Reservation not found"));
         validateStatusTransition(reservation.getStatus(), newStatus);
         reservation.setStatus(newStatus);
+        if (newStatus == BookingStatus.CANCELLED) {
+            reservationNightRepository.deleteByReservation_Id(id);
+        }
         ReservationResponse response = toResponse(reservationRepository.save(reservation));
         log.info("Updated reservation id={} status={}", id, newStatus);
         return response;
@@ -101,6 +113,7 @@ public class ReservationService {
             .orElseThrow(() -> new EntityNotFoundException("Reservation not found"));
         if (reservation.getStatus() != BookingStatus.CANCELLED) {
             reservation.setStatus(BookingStatus.CANCELLED);
+            reservationNightRepository.deleteByReservation_Id(id);
             reservationRepository.save(reservation);
         }
         log.info("Cancelled reservation id={}", id);
@@ -192,6 +205,24 @@ public class ReservationService {
         if (!valid) {
             throw new IllegalArgumentException(
                 "Invalid reservation status transition from " + currentStatus + " to " + newStatus);
+        }
+    }
+
+    private void saveReservationNights(Reservation reservation) {
+        List<ReservationNight> nights = reservation.getCheckInDate()
+            .datesUntil(reservation.getCheckOutDate())
+            .map(stayDate -> {
+                ReservationNight night = new ReservationNight();
+                night.setReservation(reservation);
+                night.setRoom(reservation.getRoom());
+                night.setStayDate(stayDate);
+                return night;
+            })
+            .toList();
+        try {
+            reservationNightRepository.saveAllAndFlush(nights);
+        } catch (DataIntegrityViolationException ex) {
+            throw new IllegalStateException("Room is not available for the requested dates", ex);
         }
     }
 

@@ -5,13 +5,16 @@ import com.reservations.landon.business.domain.ReservationResponse;
 import com.reservations.landon.data.entity.BookingStatus;
 import com.reservations.landon.data.entity.Guest;
 import com.reservations.landon.data.entity.Reservation;
+import com.reservations.landon.data.entity.ReservationNight;
 import com.reservations.landon.data.entity.Room;
 import com.reservations.landon.data.repository.GuestRepository;
+import com.reservations.landon.data.repository.ReservationNightRepository;
 import com.reservations.landon.data.repository.ReservationRepository;
 import com.reservations.landon.data.repository.RoomRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -24,6 +27,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,6 +39,8 @@ class ReservationServiceWriteTest {
     private GuestRepository guestRepository;
     @Mock
     private ReservationRepository reservationRepository;
+    @Mock
+    private ReservationNightRepository reservationNightRepository;
 
     @InjectMocks
     private ReservationService reservationService;
@@ -56,7 +62,8 @@ class ReservationServiceWriteTest {
         when(roomRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(room));
         when(guestRepository.findById(10L)).thenReturn(Optional.of(guest));
         when(reservationRepository.findConflictingReservations(any(), any(), any(), any())).thenReturn(List.of());
-        when(reservationRepository.save(any(Reservation.class))).thenReturn(saved);
+        when(reservationRepository.saveAndFlush(any(Reservation.class))).thenReturn(saved);
+        when(reservationNightRepository.saveAllAndFlush(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
 
         ReservationResponse result = reservationService.createReservation(request);
 
@@ -65,7 +72,13 @@ class ReservationServiceWriteTest {
         assertThat(result.getGuestId()).isEqualTo(10L);
         assertThat(result.getStatus()).isEqualTo(BookingStatus.PENDING);
         assertThat(result.getTotalPrice()).isEqualByComparingTo(new BigDecimal("200.00"));
-        verify(reservationRepository).save(any(Reservation.class));
+        verify(reservationRepository).saveAndFlush(any(Reservation.class));
+        verify(reservationNightRepository).saveAllAndFlush(argThat(nights -> {
+            List<ReservationNight> reservationNights = (List<ReservationNight>) nights;
+            return reservationNights.size() == 2
+                && reservationNights.get(0).getStayDate().equals(LocalDate.of(2024, 6, 15))
+                && reservationNights.get(1).getStayDate().equals(LocalDate.of(2024, 6, 16));
+        }));
     }
 
     @Test
@@ -139,7 +152,32 @@ class ReservationServiceWriteTest {
             .isInstanceOf(IllegalStateException.class)
             .hasMessage("Room is not available for the requested dates");
 
-        verify(reservationRepository, never()).save(any());
+        verify(reservationRepository, never()).saveAndFlush(any());
+        verify(reservationNightRepository, never()).saveAllAndFlush(anyList());
+    }
+
+    @Test
+    void createReservation_slotConstraintViolation_throwsIllegalStateException() {
+        Room room = buildRoom(1L, "100.00");
+        Guest guest = buildGuest(10L);
+
+        CreateReservationRequest request = buildRequest(1L, 10L,
+            LocalDate.of(2024, 6, 15), LocalDate.of(2024, 6, 17));
+
+        Reservation saved = buildReservation(100L, room, guest,
+            LocalDate.of(2024, 6, 15), LocalDate.of(2024, 6, 17),
+            BookingStatus.PENDING, new BigDecimal("200.00"));
+
+        when(roomRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(room));
+        when(guestRepository.findById(10L)).thenReturn(Optional.of(guest));
+        when(reservationRepository.findConflictingReservations(any(), any(), any(), any())).thenReturn(List.of());
+        when(reservationRepository.saveAndFlush(any(Reservation.class))).thenReturn(saved);
+        when(reservationNightRepository.saveAllAndFlush(anyList()))
+            .thenThrow(new DataIntegrityViolationException("duplicate night"));
+
+        assertThatThrownBy(() -> reservationService.createReservation(request))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("Room is not available for the requested dates");
     }
 
     // ── updateStatus ──────────────────────────────────────────────────────────
@@ -164,6 +202,28 @@ class ReservationServiceWriteTest {
 
         assertThat(result.getId()).isEqualTo(100L);
         assertThat(result.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
+    }
+
+    @Test
+    void updateStatus_confirmedToCancelled_deletesReservationNightSlots() {
+        Room room = buildRoom(1L, "100.00");
+        Guest guest = buildGuest(10L);
+
+        Reservation existing = buildReservation(100L, room, guest,
+            LocalDate.of(2024, 6, 15), LocalDate.of(2024, 6, 17),
+            BookingStatus.CONFIRMED, new BigDecimal("200.00"));
+
+        Reservation updated = buildReservation(100L, room, guest,
+            LocalDate.of(2024, 6, 15), LocalDate.of(2024, 6, 17),
+            BookingStatus.CANCELLED, new BigDecimal("200.00"));
+
+        when(reservationRepository.findById(100L)).thenReturn(Optional.of(existing));
+        when(reservationRepository.save(existing)).thenReturn(updated);
+
+        ReservationResponse result = reservationService.updateStatus(100L, BookingStatus.CANCELLED);
+
+        assertThat(result.getStatus()).isEqualTo(BookingStatus.CANCELLED);
+        verify(reservationNightRepository).deleteByReservation_Id(100L);
     }
 
     @Test
@@ -209,6 +269,7 @@ class ReservationServiceWriteTest {
         reservationService.deleteReservation(100L);
 
         assertThat(existing.getStatus()).isEqualTo(BookingStatus.CANCELLED);
+        verify(reservationNightRepository).deleteByReservation_Id(100L);
         verify(reservationRepository).save(existing);
         verify(reservationRepository, never()).deleteById(any());
     }

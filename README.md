@@ -72,7 +72,8 @@ src/main/java/com/reservations/landon/
 - Controllers accept and return DTOs (`CreateReservationRequest`, `ReservationResponse`, `RoomResponse`), not JPA entities. This prevents lazy-loading issues and keeps the API contract stable.
 - `Reservation` uses `@ManyToOne(fetch = LAZY)` to `Room` and `Guest`, with `spring.jpa.open-in-view=false` enforced. All entity traversal happens inside `@Transactional` service methods.
 - `CANCELLED` reservations are never deleted — they are kept for audit history. All availability queries filter them out.
-- Reservation creation locks the target room row while checking conflicts and saving, reducing the risk of concurrent double-booking for the same room.
+- Reservation creation locks the target room row while checking conflicts and saving.
+- Active reservation nights are also written to `RESERVATION_NIGHT`, where a unique `(ROOM_ID, STAY_DATE)` constraint gives the database a hard double-booking guard.
 
 ---
 
@@ -108,11 +109,19 @@ CHECK_IN_DATE    DATE    NOT NULL
 CHECK_OUT_DATE   DATE    NOT NULL
 STATUS           VARCHAR(16)   DEFAULT 'PENDING'
 TOTAL_PRICE      DECIMAL(10,2) NOT NULL
+
+RESERVATION_NIGHT
+────────────────────────────────────────────
+RESERVATION_NIGHT_ID  BIGINT  PK  AUTO_INCREMENT
+RESERVATION_ID        BIGINT  FK → RESERVATION
+ROOM_ID               BIGINT  FK → ROOM
+STAY_DATE             DATE    NOT NULL
+UNIQUE (ROOM_ID, STAY_DATE)
 ```
 
 `TOTAL_PRICE` is stored as a snapshot of `pricePerNight × nights` at booking time, so it is unaffected by future room price changes.
 
-Constraints enforce `CHECK_OUT_DATE > CHECK_IN_DATE` and valid status values.
+Constraints enforce `CHECK_OUT_DATE > CHECK_IN_DATE`, valid status values, and one active reservation per room per stay date.
 
 Indexes: `CHECK_IN_DATE`, `CHECK_OUT_DATE`, `GUEST_ID`, `ROOM_ID`, `STATUS`.
 

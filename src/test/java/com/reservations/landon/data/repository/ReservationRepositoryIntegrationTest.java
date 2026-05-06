@@ -87,4 +87,21 @@ class ReservationRepositoryIntegrationTest {
         assertThat(coveredOnStayDate.get(0).getRoom().getNumber()).isEqualTo("C2");
         assertThat(notCoveredOnCheckoutDate).isEmpty();
     }
+
+    @Test
+    void cancellingReservationReleasesNightSlotsForFutureBookings() {
+        Reservation reservation = reservationRepository.findByDateCovering(
+            LocalDate.of(2017, 1, 1),
+            BookingStatus.CANCELLED).get(0);
+
+        reservation.setStatus(BookingStatus.CANCELLED);
+        reservationRepository.saveAndFlush(reservation);
+
+        List<Long> bookedIds = reservationRepository.findBookedRoomIds(
+            LocalDate.of(2017, 1, 1),
+            LocalDate.of(2017, 1, 3),
+            BookingStatus.CANCELLED);
+
+        assertThat(bookedIds).isEmpty();
+    }
 }

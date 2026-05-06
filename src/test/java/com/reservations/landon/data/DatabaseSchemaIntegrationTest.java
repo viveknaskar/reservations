@@ -24,10 +24,12 @@ class DatabaseSchemaIntegrationTest {
         Integer roomCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ROOM", Integer.class);
         Integer guestCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM GUEST", Integer.class);
         Integer reservationCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM RESERVATION", Integer.class);
+        Integer reservationNightCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM RESERVATION_NIGHT", Integer.class);
 
         assertThat(roomCount).isEqualTo(28);
         assertThat(guestCount).isEqualTo(200);
         assertThat(reservationCount).isEqualTo(1);
+        assertThat(reservationNightCount).isEqualTo(2);
     }
 
     @Test
@@ -65,6 +67,19 @@ class DatabaseSchemaIntegrationTest {
         assertThatThrownBy(() -> jdbcTemplate.update("""
             INSERT INTO RESERVATION (ROOM_ID, GUEST_ID, CHECK_IN_DATE, CHECK_OUT_DATE, STATUS, TOTAL_PRICE)
             VALUES (1, 1, '2026-05-10', '2026-05-11', 'HELD', 100.00)
+            """))
+            .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void reservationNightConstraintRejectsDuplicateRoomAndStayDate() {
+        assertThatThrownBy(() -> jdbcTemplate.update("""
+            INSERT INTO RESERVATION_NIGHT (RESERVATION_ID, ROOM_ID, STAY_DATE)
+            VALUES (
+              (SELECT RESERVATION_ID FROM RESERVATION WHERE CHECK_IN_DATE = '2017-01-01'),
+              (SELECT ROOM_ID FROM ROOM WHERE ROOM_NUMBER = 'C2'),
+              '2017-01-01'
+            )
             """))
             .isInstanceOf(DataIntegrityViolationException.class);
     }
