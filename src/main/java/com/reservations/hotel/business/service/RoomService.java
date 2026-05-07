@@ -1,0 +1,30 @@
+package com.reservations.hotel.business.service;
+
+import com.reservations.hotel.data.entity.Room;
+import com.reservations.hotel.data.repository.RoomRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Comparator;
+import java.util.List;
+
+@Service
+public class RoomService {
+
+    private final RoomRepository roomRepository;
+
+    public RoomService(RoomRepository roomRepository) {
+        this.roomRepository = roomRepository;
+    }
+
+    @Transactional(readOnly = true)
+    public List<Room> getAllRooms(String roomNumber) {
+        if (roomNumber == null) {
+            return roomRepository.findAll().stream()
+                .sorted(Comparator.comparing(Room::getNumber))
+                .toList();
+        }
+        Room room = roomRepository.findByNumber(roomNumber);
+        return room != null ? List.of(room) : List.of();
+    }
+}

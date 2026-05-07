@@ -1,4 +1,4 @@
-# Landon Hotel Reservations
+# The Continental Reservations
 
 A Spring Boot hotel reservation system inspired by booking.com's core flow. Guests can be looked up, rooms can be searched by availability and capacity, and bookings can be created, confirmed, and cancelled — all through a REST API, backed by an H2 in-memory database with a Thymeleaf web UI.
 
@@ -38,7 +38,7 @@ A Spring Boot hotel reservation system inspired by booking.com's core flow. Gues
 The application follows a standard layered architecture:
 
 ```
-src/main/java/com/reservations/landon/
+src/main/java/com/reservations/hotel/
 ├── business/
 │   ├── controller/         # HTTP layer — REST controllers + Thymeleaf controller
 │   │   ├── ReservationServiceController.java   # REST: bookings CRUD
