@@ -45,11 +45,13 @@ class DatabaseSchemaIntegrationTest {
             JOIN GUEST g ON g.GUEST_ID = r.GUEST_ID
             """, String.class);
         String status = jdbcTemplate.queryForObject("SELECT STATUS FROM RESERVATION", String.class);
+        Integer guestCount = jdbcTemplate.queryForObject("SELECT GUEST_COUNT FROM RESERVATION", Integer.class);
         BigDecimal totalPrice = jdbcTemplate.queryForObject("SELECT TOTAL_PRICE FROM RESERVATION", BigDecimal.class);
 
         assertThat(roomNumber).isEqualTo("C2");
         assertThat(guestName).isEqualTo("Judith Young");
         assertThat(status).isEqualTo("CONFIRMED");
+        assertThat(guestCount).isEqualTo(2);
         assertThat(totalPrice).isEqualByComparingTo(new BigDecimal("218.00"));
     }
 
@@ -58,6 +60,15 @@ class DatabaseSchemaIntegrationTest {
         assertThatThrownBy(() -> jdbcTemplate.update("""
             INSERT INTO RESERVATION (ROOM_ID, GUEST_ID, CHECK_IN_DATE, CHECK_OUT_DATE, STATUS, TOTAL_PRICE)
             VALUES (1, 1, '2026-05-10', '2026-05-10', 'PENDING', 100.00)
+            """))
+            .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void reservationGuestCountConstraintRejectsZero() {
+        assertThatThrownBy(() -> jdbcTemplate.update("""
+            INSERT INTO RESERVATION (ROOM_ID, GUEST_ID, GUEST_COUNT, CHECK_IN_DATE, CHECK_OUT_DATE, STATUS, TOTAL_PRICE)
+            VALUES (1, 1, 0, '2026-05-10', '2026-05-11', 'PENDING', 100.00)
             """))
             .isInstanceOf(DataIntegrityViolationException.class);
     }

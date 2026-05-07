@@ -19,6 +19,8 @@ public class ReservationResponse extends RepresentationModel<ReservationResponse
     private String roomNumber;
     @Schema(description = "Guest ID", example = "85")
     private long guestId;
+    @Schema(description = "Number of guests staying in the room", example = "2")
+    private int guestCount;
     @Schema(description = "Guest first name", example = "Judith")
     private String guestFirstName;
     @Schema(description = "Guest last name", example = "Young")
@@ -70,6 +72,14 @@ public class ReservationResponse extends RepresentationModel<ReservationResponse
 
     public void setGuestId(long guestId) {
         this.guestId = guestId;
+    }
+
+    public int getGuestCount() {
+        return guestCount;
+    }
+
+    public void setGuestCount(int guestCount) {
+        this.guestCount = guestCount;
     }
 
     public String getGuestFirstName() {

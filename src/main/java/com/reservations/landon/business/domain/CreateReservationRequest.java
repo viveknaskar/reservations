@@ -17,6 +17,10 @@ public class CreateReservationRequest {
     @Positive(message = "Guest ID must be a positive number")
     private long guestId;
 
+    @Schema(description = "Number of guests staying in the room", example = "2")
+    @Positive(message = "Guest count must be a positive number")
+    private int guestCount;
+
     @Schema(description = "First night of the stay", example = "2025-07-01")
     @NotNull(message = "Check-in date is required")
     private LocalDate checkInDate;
@@ -39,6 +43,14 @@ public class CreateReservationRequest {
 
     public void setGuestId(long guestId) {
         this.guestId = guestId;
+    }
+
+    public int getGuestCount() {
+        return guestCount;
+    }
+
+    public void setGuestCount(int guestCount) {
+        this.guestCount = guestCount;
     }
 
     public LocalDate getCheckInDate() {

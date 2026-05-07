@@ -105,6 +105,7 @@ RESERVATION
 RESERVATION_ID   BIGINT  PK  AUTO_INCREMENT
 ROOM_ID          BIGINT  FK → ROOM
 GUEST_ID         BIGINT  FK → GUEST
+GUEST_COUNT      INT     NOT NULL
 CHECK_IN_DATE    DATE    NOT NULL
 CHECK_OUT_DATE   DATE    NOT NULL
 STATUS           VARCHAR(16)   DEFAULT 'PENDING'
@@ -245,6 +246,7 @@ Returns all reservations (across all dates and statuses) for a specific guest.
     "roomName": "Cambridge",
     "roomNumber": "C2",
     "guestId": 85,
+    "guestCount": 2,
     "guestFirstName": "Jane",
     "guestLastName": "Young",
     "checkInDate": "2017-01-01",
@@ -266,6 +268,7 @@ Content-Type: application/json
 {
   "roomId": 7,
   "guestId": 85,
+  "guestCount": 2,
   "checkInDate": "2025-07-01",
   "checkOutDate": "2025-07-05"
 }
@@ -275,9 +278,10 @@ The service will:
 1. Validate that `checkOutDate` is after `checkInDate`
 2. Verify the room exists
 3. Verify the guest exists
-4. Check for conflicting reservations (any non-cancelled booking that overlaps the requested range)
-5. Calculate `totalPrice = pricePerNight × nights`
-6. Save with status `PENDING`
+4. Verify `guestCount` does not exceed the room capacity
+5. Check for conflicting reservations (any non-cancelled booking that overlaps the requested range)
+6. Calculate `totalPrice = pricePerNight × nights`
+7. Save with status `PENDING`
 
 **Response:** `201 Created` with a `ReservationResponse` body.
 
@@ -329,7 +333,7 @@ Cancels the reservation without deleting the record. This is equivalent to a sof
 
 3. Create a booking
    POST /api/reservations
-   { "roomId": 7, "guestId": 85, "checkInDate": "2025-07-01", "checkOutDate": "2025-07-05" }
+   { "roomId": 7, "guestId": 85, "guestCount": 2, "checkInDate": "2025-07-01", "checkOutDate": "2025-07-05" }
    → 201 Created, status: PENDING
 
 4. Confirm the booking

@@ -22,6 +22,9 @@ public class Reservation {
     @JoinColumn(name="GUEST_ID", nullable=false)
     private Guest guest;
 
+    @Column(name="GUEST_COUNT", nullable=false)
+    private int guestCount = 1;
+
     @Column(name="CHECK_IN_DATE", nullable=false)
     private LocalDate checkInDate;
 
@@ -57,6 +60,14 @@ public class Reservation {
 
     public void setGuest(Guest guest) {
         this.guest = guest;
+    }
+
+    public int getGuestCount() {
+        return guestCount;
+    }
+
+    public void setGuestCount(int guestCount) {
+        this.guestCount = guestCount;
     }
 
     public LocalDate getCheckInDate() {

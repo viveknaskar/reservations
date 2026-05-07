@@ -70,6 +70,7 @@ class ReservationServiceWriteTest {
         assertThat(result.getId()).isEqualTo(100L);
         assertThat(result.getRoomId()).isEqualTo(1L);
         assertThat(result.getGuestId()).isEqualTo(10L);
+        assertThat(result.getGuestCount()).isEqualTo(2);
         assertThat(result.getStatus()).isEqualTo(BookingStatus.PENDING);
         assertThat(result.getTotalPrice()).isEqualByComparingTo(new BigDecimal("200.00"));
         verify(reservationRepository).saveAndFlush(any(Reservation.class));
@@ -152,6 +153,28 @@ class ReservationServiceWriteTest {
             .isInstanceOf(IllegalStateException.class)
             .hasMessage("Room is not available for the requested dates");
 
+        verify(reservationRepository, never()).saveAndFlush(any());
+        verify(reservationNightRepository, never()).saveAllAndFlush(anyList());
+    }
+
+    @Test
+    void createReservation_guestCountExceedsRoomCapacity_throwsIllegalArgumentException() {
+        Room room = buildRoom(1L, "100.00");
+        room.setMaxCapacity(2);
+        Guest guest = buildGuest(10L);
+
+        CreateReservationRequest request = buildRequest(1L, 10L,
+            LocalDate.of(2024, 6, 15), LocalDate.of(2024, 6, 17));
+        request.setGuestCount(3);
+
+        when(roomRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(room));
+        when(guestRepository.findById(10L)).thenReturn(Optional.of(guest));
+
+        assertThatThrownBy(() -> reservationService.createReservation(request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Guest count exceeds room capacity");
+
+        verify(reservationRepository, never()).findConflictingReservations(any(), any(), any(), any());
         verify(reservationRepository, never()).saveAndFlush(any());
         verify(reservationNightRepository, never()).saveAllAndFlush(anyList());
     }
@@ -292,6 +315,7 @@ class ReservationServiceWriteTest {
         r.setId(id);
         r.setName("Suite A");
         r.setNumber("1A");
+        r.setMaxCapacity(2);
         r.setPricePerNight(new BigDecimal(price));
         return r;
     }
@@ -309,6 +333,7 @@ class ReservationServiceWriteTest {
         CreateReservationRequest req = new CreateReservationRequest();
         req.setRoomId(roomId);
         req.setGuestId(guestId);
+        req.setGuestCount(2);
         req.setCheckInDate(checkIn);
         req.setCheckOutDate(checkOut);
         return req;
@@ -321,6 +346,7 @@ class ReservationServiceWriteTest {
         r.setId(id);
         r.setRoom(room);
         r.setGuest(guest);
+        r.setGuestCount(2);
         r.setCheckInDate(checkIn);
         r.setCheckOutDate(checkOut);
         r.setStatus(status);

@@ -93,6 +93,7 @@ class ReservationServiceControllerTest {
         CreateReservationRequest request = new CreateReservationRequest();
         request.setRoomId(1L);
         request.setGuestId(10L);
+        request.setGuestCount(2);
         request.setCheckInDate(LocalDate.of(2024, 6, 15));
         request.setCheckOutDate(LocalDate.of(2024, 6, 17));
 
@@ -100,6 +101,7 @@ class ReservationServiceControllerTest {
         response.setId(100L);
         response.setRoomId(1L);
         response.setGuestId(10L);
+        response.setGuestCount(2);
         response.setStatus(BookingStatus.PENDING);
 
         when(reservationService.createReservation(any(CreateReservationRequest.class))).thenReturn(response);
@@ -111,6 +113,7 @@ class ReservationServiceControllerTest {
                 .andExpect(jsonPath("$.id").value(100L))
                 .andExpect(jsonPath("$.roomId").value(1L))
                 .andExpect(jsonPath("$.guestId").value(10L))
+                .andExpect(jsonPath("$.guestCount").value(2))
                 .andExpect(jsonPath("$.status").value("PENDING"));
     }
 
@@ -119,6 +122,7 @@ class ReservationServiceControllerTest {
         CreateReservationRequest request = new CreateReservationRequest();
         request.setRoomId(1L);
         request.setGuestId(10L);
+        request.setGuestCount(2);
         // checkInDate intentionally left null
         request.setCheckOutDate(LocalDate.of(2024, 6, 17));
 
@@ -135,6 +139,7 @@ class ReservationServiceControllerTest {
         CreateReservationRequest request = new CreateReservationRequest();
         request.setRoomId(1L);
         request.setGuestId(10L);
+        request.setGuestCount(2);
         request.setCheckInDate(LocalDate.of(2024, 6, 17));
         request.setCheckOutDate(LocalDate.of(2024, 6, 15));
 
@@ -152,6 +157,7 @@ class ReservationServiceControllerTest {
         CreateReservationRequest request = new CreateReservationRequest();
         request.setRoomId(1L);
         request.setGuestId(10L);
+        request.setGuestCount(2);
         request.setCheckInDate(LocalDate.of(2024, 6, 15));
         request.setCheckOutDate(LocalDate.of(2024, 6, 17));
 
@@ -169,6 +175,7 @@ class ReservationServiceControllerTest {
         CreateReservationRequest request = new CreateReservationRequest();
         request.setRoomId(99L);
         request.setGuestId(10L);
+        request.setGuestCount(2);
         request.setCheckInDate(LocalDate.of(2024, 6, 15));
         request.setCheckOutDate(LocalDate.of(2024, 6, 17));
 

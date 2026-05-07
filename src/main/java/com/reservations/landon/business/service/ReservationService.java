@@ -58,6 +58,9 @@ public class ReservationService {
             .orElseThrow(() -> new EntityNotFoundException("Room not found"));
         Guest guest = guestRepository.findById(request.getGuestId())
             .orElseThrow(() -> new EntityNotFoundException("Guest not found"));
+        if (request.getGuestCount() > room.getMaxCapacity()) {
+            throw new IllegalArgumentException("Guest count exceeds room capacity");
+        }
 
         List<Reservation> conflicts = reservationRepository.findConflictingReservations(
             request.getRoomId(), request.getCheckInDate(), request.getCheckOutDate(), BookingStatus.CANCELLED);
@@ -71,6 +74,7 @@ public class ReservationService {
         Reservation reservation = new Reservation();
         reservation.setRoom(room);
         reservation.setGuest(guest);
+        reservation.setGuestCount(request.getGuestCount());
         reservation.setCheckInDate(request.getCheckInDate());
         reservation.setCheckOutDate(request.getCheckOutDate());
         reservation.setStatus(BookingStatus.PENDING);
@@ -184,6 +188,7 @@ public class ReservationService {
         resp.setRoomName(r.getRoom().getName());
         resp.setRoomNumber(r.getRoom().getNumber());
         resp.setGuestId(r.getGuest().getId());
+        resp.setGuestCount(r.getGuestCount());
         resp.setGuestFirstName(r.getGuest().getFirstName());
         resp.setGuestLastName(r.getGuest().getLastName());
         resp.setCheckInDate(r.getCheckInDate());
