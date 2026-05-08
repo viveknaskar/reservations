@@ -13,22 +13,83 @@
             <span class="brand-mark" aria-hidden="true">TC</span>
             <span>The Continental Reservations</span>
         </a>
-        <form class="date-form" method="get" action="/reservations">
-            <label for="reservation-date">Date</label>
-            <div class="date-control">
-                <input
-                    type="date"
-                    id="reservation-date"
-                    name="date"
-                    th:value="${param.date != null ? param.date[0] : #temporals.format(#temporals.createNow(), 'yyyy-MM-dd')}"
-                />
-                <button type="submit">View</button>
-            </div>
-        </form>
+        <div class="header-actions">
+            <button type="button" class="theme-toggle" id="theme-toggle" aria-pressed="false">
+                <span class="theme-icon" aria-hidden="true">☾</span>
+                <span class="theme-label">Dark</span>
+            </button>
+            <form class="date-form" method="get" action="/reservations">
+                <label for="reservation-date">Date</label>
+                <div class="date-control">
+                    <input
+                        type="date"
+                        id="reservation-date"
+                        name="date"
+                        th:value="${param.date != null ? param.date[0] : #temporals.format(#temporals.createNow(), 'yyyy-MM-dd')}"
+                    />
+                    <button type="submit">View</button>
+                </div>
+            </form>
+        </div>
     </div>
 </header>
 
 <main class="app-shell page">
+    <section class="booking-workspace" aria-label="Book a stay">
+        <div class="availability-panel">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Availability</p>
+                    <h1>Book a stay</h1>
+                </div>
+                <p class="section-meta" id="availability-count">0 rooms</p>
+            </div>
+
+            <form class="booking-search" id="availability-form">
+                <label>
+                    <span>Check-in</span>
+                    <input type="date" id="check-in" name="checkIn" required/>
+                </label>
+                <label>
+                    <span>Check-out</span>
+                    <input type="date" id="check-out" name="checkOut" required/>
+                </label>
+                <label>
+                    <span>Guests</span>
+                    <input type="number" id="min-capacity" name="minCapacity" min="1" max="8" value="1" required/>
+                </label>
+                <button type="submit">Search</button>
+            </form>
+
+            <div class="room-results" id="available-rooms" aria-live="polite">
+                <p class="empty-state">Search dates to see available rooms.</p>
+            </div>
+        </div>
+
+        <aside class="booking-panel" aria-label="Create reservation">
+            <div>
+                <p class="eyebrow">Booking</p>
+                <h2>Reservation</h2>
+            </div>
+            <div class="selected-room" id="selected-room">
+                <p class="empty-state">Select an available room.</p>
+            </div>
+            <form class="reservation-form" id="reservation-form">
+                <input type="hidden" id="room-id" name="roomId"/>
+                <label>
+                    <span>Guest ID</span>
+                    <input type="number" id="guest-id" name="guestId" min="1" required/>
+                </label>
+                <label>
+                    <span>Guest count</span>
+                    <input type="number" id="guest-count" name="guestCount" min="1" value="1" required/>
+                </label>
+                <button type="submit" id="book-button" disabled>Book room</button>
+            </form>
+            <div class="form-alert" id="booking-alert" role="status" aria-live="polite"></div>
+        </aside>
+    </section>
+
     <section class="summary-strip" aria-label="Reservation summary">
         <div>
             <p class="eyebrow">Occupancy</p>
