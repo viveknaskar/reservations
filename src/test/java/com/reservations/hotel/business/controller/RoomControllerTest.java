@@ -33,7 +33,7 @@ class RoomControllerTest {
 
         when(roomService.getAllRooms(null)).thenReturn(List.of(room));
 
-        mockMvc.perform(get("/rooms"))
+        mockMvc.perform(get("/api/rooms"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].name").value("Suite A"))
                 .andExpect(jsonPath("$[0].number").value("1A"));
@@ -49,7 +49,7 @@ class RoomControllerTest {
 
         when(roomService.getAllRooms("1A")).thenReturn(List.of(room));
 
-        mockMvc.perform(get("/rooms").param("roomNumber", "1A"))
+        mockMvc.perform(get("/api/rooms").param("roomNumber", "1A"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].name").value("Suite A"));
     }
@@ -58,7 +58,7 @@ class RoomControllerTest {
     void findAll_withUnknownRoomNumber_returnsEmptyList() throws Exception {
         when(roomService.getAllRooms("99")).thenReturn(List.of());
 
-        mockMvc.perform(get("/rooms").param("roomNumber", "99"))
+        mockMvc.perform(get("/api/rooms").param("roomNumber", "99"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isEmpty());
     }

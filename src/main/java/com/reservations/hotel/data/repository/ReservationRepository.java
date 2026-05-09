@@ -52,7 +52,13 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
         @Param("cancelled") BookingStatus cancelled
     );
 
-    List<Reservation> findByGuest_Id(Long guestId);
+    @Query("""
+        SELECT r FROM Reservation r
+        JOIN FETCH r.room
+        JOIN FETCH r.guest
+        WHERE r.guest.id = :guestId
+        """)
+    List<Reservation> findByGuest_Id(@Param("guestId") Long guestId);
 
     List<Reservation> findByStatus(BookingStatus status);
 }
